@@ -6,11 +6,15 @@ WeDID resolves [W3C Decentralized Identifiers](https://www.w3.org/TR/did-core/) 
 
 ## What it does
 
-You encounter a DID — on a merchant's page, in a QR code, embedded in a link. WeDID resolves it to a DID Document and shows you what's there: who they are, what services they offer, and whether the identity checks out.
+You land on a website and WeDID treats the current domain as the identity input. It tries to resolve the site's root-domain DID, then surfaces any explicit DID hints the page provides. The result is simple: who this site says it is, what services it exposes, and whether the identity checks out.
 
 ### On any page
 
-WeDID scans for DIDs automatically:
+WeDID resolves the current site automatically:
+
+- **`https://example.com` -> `did:web:example.com`** — WeDID fetches `https://example.com/.well-known/did.json`.
+
+WeDID also scans for explicit DID hints:
 
 - **`<meta name="did" content="did:web:qart.app:users:fresh-farms">`** — the page declares its identity. WeDID resolves it and shows a green badge in the toolbar.
 - **`<a href="did:web:example.com">`** — a DID link. WeDID resolves it and adds a verification checkmark.
@@ -18,20 +22,16 @@ WeDID scans for DIDs automatically:
 
 ### In the popup
 
-Click the WeDID icon to manually resolve any DID:
+Click the WeDID icon and it resolves the active site's DID automatically:
 
 ```
 ┌─────────────────────────────┐
 │ WeDID                 v0.1.0│
 ├─────────────────────────────┤
-│ ┌─────────────────────────┐ │
-│ │ did:web:qart.app:users: │ │
-│ │ fresh-farms             │ │
-│ └─────────────────────────┘ │
-│ [ Resolve ]                 │
+│ CURRENT SITE                │
+│ ryanwold.net                │
 ├─────────────────────────────┤
-│ did:web:qart.app:users:     │
-│ fresh-farms                 │
+│ did:web:ryanwold.net        │
 │                             │
 │ VERIFICATION METHODS        │
 │ JsonWebKey2020 #key-1       │
@@ -49,6 +49,7 @@ The popup tells you:
 - **Who** — the DID and its verification methods (keys)
 - **What** — service endpoints (profile pages, payment services, commerce APIs)
 - **How** — whether the resolution was cached, fetched, or self-certified (did:key)
+- **Where** — which current site was used as the identity input
 
 ### Badge indicators
 
@@ -90,6 +91,8 @@ Or a link tag:
 ```
 
 WeDID will resolve it automatically for visitors who have the extension installed.
+
+If your site's DID is simply `did:web:yoursite.com`, you do not need an HTML hint. WeDID will derive it from the current host and fetch `/.well-known/did.json` automatically.
 
 ### Listen for resolution
 
@@ -146,6 +149,7 @@ WeDID is the browser polyfill for a future where DID resolution is native — th
 2. Open `chrome://extensions`
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the `wedid` directory
+5. After code changes, click `Reload` for the extension and refresh the page you're testing
 
 ### From the Chrome Web Store
 

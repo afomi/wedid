@@ -17,6 +17,7 @@
   const RESOLVED_ATTR = "data-wedid-resolved";
 
   // Run on page load
+  resolveCurrentSiteDid();
   scanPage();
 
   // Watch for dynamic content
@@ -31,10 +32,48 @@
     if (shouldScan) scanPage();
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  function getCurrentSiteDid() {
+    const { protocol, host, hostname } = window.location;
+    const isLocalHttp = protocol === "http:" && isLocalhost(hostname);
+
+    if ((protocol !== "https:" && !isLocalHttp) || !host) {
+      return null;
+    }
+
+    return `did:web:${encodeURIComponent(host)}`;
+  }
+
+  function isLocalhost(hostname) {
+    return hostname === "localhost" || hostname.endsWith(".localhost");
+  }
+
+  async function resolveCurrentSiteDid() {
+    const did = getCurrentSiteDid();
+    if (!did) return;
+
+    const result = await chrome.runtime.sendMessage({
+      type: "resolveSiteDid",
+      did,
+    });
+
+    if (result.didDocument) {
+      window.dispatchEvent(
+        new CustomEvent("wedid:site-resolved", {
+          detail: {
+            did,
+            services: result.didDocument.service || [],
+          },
+        })
+      );
+    }
+  }
 
   function scanPage() {
     // 1. Elements with data-did attribute
@@ -66,7 +105,7 @@
     }
 
     // 4. Link rel="did"
-    const linkDid = document.querySelector('link[rel="did"]');
+    const linkDid = document.querySelector('link[rel~="did"]');
     if (linkDid && !linkDid.hasAttribute(RESOLVED_ATTR)) {
       const did = linkDid.getAttribute("href");
       if (did) {

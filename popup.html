@@ -35,40 +35,25 @@
       color: #888;
     }
 
-    .lookup {
+    .site {
       padding: 12px 16px;
       border-bottom: 1px solid #e5e5e5;
     }
 
-    .lookup input {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      font-size: 13px;
+    .site-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .site-host {
       font-family: "SF Mono", "Fira Code", monospace;
-      outline: none;
-    }
-
-    .lookup input:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-    }
-
-    .lookup button {
-      margin-top: 8px;
-      width: 100%;
-      padding: 7px;
-      background: #1a1a1a;
-      color: white;
-      border: none;
-      border-radius: 4px;
       font-size: 13px;
-      cursor: pointer;
-    }
-
-    .lookup button:hover {
-      background: #333;
+      color: #0f172a;
+      word-break: break-all;
     }
 
     #status {
@@ -145,6 +130,13 @@
       padding: 8px 0;
     }
 
+    .status-subtle {
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+
     .meta {
       font-size: 11px;
       color: #aaa;
@@ -169,20 +161,14 @@
     <span class="version">v0.1.0</span>
   </header>
 
-  <div class="lookup">
-    <input
-      type="text"
-      id="did-input"
-      placeholder="did:web:example.com"
-      spellcheck="false"
-      autocomplete="off"
-    >
-    <button id="resolve-btn">Resolve</button>
+  <div class="site">
+    <div class="site-label">Current Site</div>
+    <div id="site-host" class="site-host">Checking active tab...</div>
   </div>
 
   <div id="status">
     <div class="status-empty">
-      Enter a DID to resolve, or visit a page with DID metadata.
+      Resolving site DID...
     </div>
   </div>
 

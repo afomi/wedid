@@ -1,47 +1,210 @@
 /**
  * WeDID Popup
  *
- * Manual DID lookup and display of resolved DID documents.
+ * Resolves the active site's DID automatically.
  */
 
-const input = document.getElementById("did-input");
-const btn = document.getElementById("resolve-btn");
+const siteHost = document.getElementById("site-host");
 const status = document.getElementById("status");
 
-btn.addEventListener("click", () => resolve());
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") resolve();
+init().catch((error) => {
+  renderError(error.message || "Failed to inspect the current tab.");
 });
 
-// On open, check if the current page has a resolved DID
-chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-  if (tabs[0]) {
-    chrome.runtime.sendMessage(
-      { type: "getState", tabId: tabs[0].id },
-      (state) => {
-        if (state && state.dids && state.dids.length > 0) {
-          input.value = state.dids[0];
-          resolve();
-        }
-      }
-    );
-  }
-});
-
-async function resolve() {
-  const did = input.value.trim();
-  if (!did) return;
-
-  status.innerHTML = '<div class="status-empty">Resolving...</div>';
-
-  const result = await chrome.runtime.sendMessage({ type: "resolve", did });
-
-  if (result.didResolutionMetadata.error) {
-    status.innerHTML = `<div class="error">${escapeHtml(result.didResolutionMetadata.message)}</div>`;
+async function init() {
+  const [tab] = await queryActiveTab();
+  if (!tab || typeof tab.id !== "number") {
+    siteHost.textContent = "No active tab";
+    renderEmpty("Open a website to resolve its DID.");
     return;
   }
 
-  renderDocument(result);
+  const context = getSiteContext(tab.url);
+  siteHost.textContent = context.label;
+
+  if (!context.supported) {
+    renderEmpty(context.message);
+    return;
+  }
+
+  status.innerHTML = '<div class="status-empty">Resolving site DID...</div>';
+
+  const state = await sendMessage({
+    type: "getState",
+    tabId: tab.id,
+  }).catch(() => null);
+
+  if (state?.primaryResult) {
+    renderResult(state.primaryResult, context.did);
+    return;
+  }
+
+  const result = await resolveSiteDid(context, tab.id);
+
+  renderResult(result, context.did);
+}
+
+function getSiteContext(rawUrl) {
+  if (!rawUrl) {
+    return {
+      supported: false,
+      label: "Unknown page",
+      message: "Open a website over HTTPS to resolve its DID.",
+    };
+  }
+
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return {
+      supported: false,
+      label: rawUrl,
+      message: "Open a website over HTTPS to resolve its DID.",
+    };
+  }
+
+  const isLocalHttp = url.protocol === "http:" && isLocalhost(url.hostname);
+  if (url.protocol !== "https:" && !isLocalHttp) {
+    return {
+      supported: false,
+      label: url.host || rawUrl,
+      message: "Open a website over HTTPS to resolve its DID.",
+    };
+  }
+
+  return {
+    supported: true,
+    label: url.host,
+    host: url.host,
+    did: `did:web:${encodeURIComponent(url.host)}`,
+  };
+}
+
+function isLocalhost(hostname) {
+  return hostname === "localhost" || hostname.endsWith(".localhost");
+}
+
+function queryActiveTab() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(tabs || []);
+    });
+  });
+}
+
+function sendMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(response);
+    });
+  });
+}
+
+async function resolveSiteDid(context, tabId) {
+  const runtimeResult = await sendMessage({
+    type: "resolveSiteDid",
+    did: context.did,
+    tabId,
+  }).catch(() => null);
+
+  if (runtimeResult) {
+    return runtimeResult;
+  }
+
+  return resolveDidWebDirect(context);
+}
+
+async function resolveDidWebDirect(context) {
+  const url = `https://${context.host}/.well-known/did.json`;
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/did+json, application/json" },
+    });
+
+    if (!response.ok) {
+      return {
+        didDocument: null,
+        didResolutionMetadata: {
+          error: "notFound",
+          message: `DID document not found at ${url} (HTTP ${response.status})`,
+          url,
+        },
+        didDocumentMetadata: {},
+      };
+    }
+
+    const didDocument = await response.json();
+    if (didDocument.id && didDocument.id !== context.did) {
+      return {
+        didDocument: null,
+        didResolutionMetadata: {
+          error: "invalidDidDocument",
+          message: `DID document ID "${didDocument.id}" does not match requested DID "${context.did}"`,
+          url,
+        },
+        didDocumentMetadata: {},
+      };
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    return {
+      didDocument,
+      didResolutionMetadata: {
+        contentType: contentType.includes("did+json")
+          ? "application/did+json"
+          : "application/json",
+        retrieved: new Date().toISOString(),
+        url,
+        fallback: true,
+      },
+      didDocumentMetadata: {},
+    };
+  } catch (error) {
+    return {
+      didDocument: null,
+      didResolutionMetadata: {
+        error: "internalError",
+        message: error.message || `Failed to fetch ${url}`,
+        url,
+      },
+      didDocumentMetadata: {},
+    };
+  }
+}
+
+function renderResult(result, expectedDid) {
+  if (!result) {
+    renderError("Resolver returned no result.");
+    return;
+  }
+
+  if (result.didDocument) {
+    renderDocument(result);
+    return;
+  }
+
+  const meta = result.didResolutionMetadata || {};
+  if (meta.error === "notFound") {
+    renderEmpty(
+      "No site DID found.",
+      `Expected ${expectedDid} at /.well-known/did.json`
+    );
+    return;
+  }
+
+  renderError(meta.message || "DID resolution failed.");
 }
 
 function renderDocument(result) {
@@ -92,6 +255,18 @@ function renderDocument(result) {
 
   html += "</div>";
   status.innerHTML = html;
+}
+
+function renderEmpty(message, detail = "") {
+  let html = `<div class="status-empty">${escapeHtml(message)}</div>`;
+  if (detail) {
+    html += `<div class="status-subtle">${escapeHtml(detail)}</div>`;
+  }
+  status.innerHTML = html;
+}
+
+function renderError(message) {
+  status.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
 }
 
 function escapeHtml(str) {

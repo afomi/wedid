@@ -8,16 +8,38 @@
 importScripts("resolver.js");
 
 const resolver = new DIDResolver();
+const tabState = new Map();
 
 // Listen for messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "resolve") {
-    handleResolve(message.did).then(sendResponse);
+  const tabId = message.tabId ?? sender.tab?.id;
+
+  if (message.type === "resolve" || message.type === "resolveSiteDid") {
+    handleResolve(message.did, {
+      tabId,
+      remember: Boolean(message.remember) || message.type === "resolveSiteDid",
+      primary: Boolean(message.primary) || message.type === "resolveSiteDid",
+    }).then(sendResponse).catch((error) => {
+      sendResponse({
+        didDocument: null,
+        didResolutionMetadata: {
+          error: "internalError",
+          message: error.message || "DID resolution failed",
+        },
+        didDocumentMetadata: {},
+      });
+    });
     return true; // async response
   }
 
   if (message.type === "getServices") {
-    handleGetServices(message.did, message.serviceType).then(sendResponse);
+    handleGetServices(message.did, message.serviceType).then(sendResponse).catch((error) => {
+      sendResponse({
+        error: "internalError",
+        message: error.message || "Failed to get services",
+        services: [],
+      });
+    });
     return true;
   }
 
@@ -28,20 +50,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "getState") {
-    handleGetState(sender.tab?.id).then(sendResponse);
+    handleGetState(tabId).then(sendResponse).catch(() => {
+      sendResponse({ dids: [] });
+    });
     return true;
   }
 });
 
-// Track resolved DIDs per tab
-const tabState = new Map();
-
-async function handleResolve(did) {
+async function handleResolve(did, options = {}) {
   const result = await resolver.resolve(did);
 
+  if (typeof options.tabId === "number" && (options.remember || options.primary)) {
+    rememberTabResult(options.tabId, did, result, options.primary);
+  }
+
   if (result.didDocument) {
-    // Update badge for the requesting tab
-    updateBadge(result);
+    updateBadge(result, options.tabId);
   }
 
   return result;
@@ -58,21 +82,47 @@ async function handleGetServices(did, serviceType) {
 }
 
 async function handleGetState(tabId) {
+  if (typeof tabId !== "number") {
+    return { dids: [] };
+  }
   return tabState.get(tabId) || { dids: [] };
 }
 
-function updateBadge(result) {
+function rememberTabResult(tabId, did, result, isPrimary) {
+  const current = tabState.get(tabId) || { dids: [] };
+  const next = {
+    ...current,
+    dids: [...current.dids],
+  };
+
+  if (result.didDocument && !next.dids.includes(did)) {
+    next.dids.unshift(did);
+  }
+
+  if (isPrimary) {
+    next.primaryDid = did;
+    next.primaryResult = result;
+  }
+
+  tabState.set(tabId, next);
+}
+
+function updateBadge(result, tabId) {
   if (!result.didDocument) return;
 
   const services = DIDResolver.getServices(result.didDocument);
   const hasServices = services.length > 0;
+  const badgeColor = hasServices ? "#059669" : "#2563eb";
+  const badgeText = hasServices ? "OK" : "ID";
+  const badgeOptions = typeof tabId === "number" ? { tabId } : {};
 
-  // Green if services found, blue if just identity
   chrome.action.setBadgeBackgroundColor({
-    color: hasServices ? "#059669" : "#2563eb",
+    ...badgeOptions,
+    color: badgeColor,
   });
   chrome.action.setBadgeText({
-    text: hasServices ? "OK" : "ID",
+    ...badgeOptions,
+    text: badgeText,
   });
 }
 
