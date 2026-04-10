@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #fff;
+    }
+
+    header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    header .version {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .lookup {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .lookup input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      outline: none;
+    }
+
+    .lookup input:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .lookup button {
+      margin-top: 8px;
+      width: 100%;
+      padding: 7px;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .lookup button:hover {
+      background: #333;
+    }
+
+    #status {
+      padding: 12px 16px;
+    }
+
+    .status-empty {
+      color: #888;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .did-result {
+      padding: 8px 0;
+    }
+
+    .did-id {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      word-break: break-all;
+      color: #2563eb;
+      margin-bottom: 8px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      margin: 8px 0 4px;
+    }
+
+    .service-item {
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .service-type {
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .service-endpoint {
+      font-size: 11px;
+      color: #059669;
+      text-decoration: none;
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .service-endpoint:hover {
+      text-decoration: underline;
+    }
+
+    .verification-methods {
+      list-style: none;
+    }
+
+    .verification-methods li {
+      font-size: 12px;
+      padding: 2px 0;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: #555;
+    }
+
+    .error {
+      color: #dc2626;
+      font-size: 12px;
+      padding: 8px 0;
+    }
+
+    .meta {
+      font-size: 11px;
+      color: #aaa;
+      padding: 8px 16px;
+      border-top: 1px solid #e5e5e5;
+      text-align: center;
+    }
+
+    .meta a {
+      color: #888;
+      text-decoration: none;
+    }
+
+    .meta a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WeDID</h1>
+    <span class="version">v0.1.0</span>
+  </header>
+
+  <div class="lookup">
+    <input
+      type="text"
+      id="did-input"
+      placeholder="did:web:example.com"
+      spellcheck="false"
+      autocomplete="off"
+    >
+    <button id="resolve-btn">Resolve</button>
+  </div>
+
+  <div id="status">
+    <div class="status-empty">
+      Enter a DID to resolve, or visit a page with DID metadata.
+    </div>
+  </div>
+
+  <div class="meta">
+    <a
+      href="https://wedid.app"
+      target="_blank"
+    >wedid.app</a>
+    &middot;
+    W3C DID Resolver
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
